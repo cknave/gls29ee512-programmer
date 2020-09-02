@@ -46,7 +46,7 @@ void setup() {
   PORT_CTRL = OUTPUT_DISABLED | CHIP_DISABLED | WRITE_DISABLED;
   setDataReadMode();
 
-  Serial.begin(57600);
+  Serial.begin(500000);
 
   ProductId productId = getProductId();
   char buf[32];
@@ -112,6 +112,7 @@ void loop() {
     } else {
       Serial.println("FAIL");
     }
+    return;
   }
   if(!strncmp("hexdump", inputBuffer, cmdEnd)) {
     hexDump();
