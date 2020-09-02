@@ -52,9 +52,14 @@ void setup() {
 
 void loop() {
   char buf[128];
+
+  while(true) {
+  
   ProductId productId = getProductId();
   sprintf(buf, "Manufacturer: %02X, product: %02X", productId.manufacturer, productId.device);
   Serial.println(buf);
+  delay(250);
+  }
 
   while(true) { delay(1000); }
 
@@ -85,9 +90,9 @@ ProductId getProductId() {
   PORT_CTRL = CHIP_DISABLED | OUTPUT_DISABLED | WRITE_DISABLED;
   delayMicroseconds(10);
 
-  PORT_CTRL = CHIP_ENABLED | OUTPUT_ENABLED | WRITE_DISABLED;
   // Data pins to input mode
   DDR_DATA = 0x00;
+  PORT_CTRL = CHIP_ENABLED | OUTPUT_ENABLED | WRITE_DISABLED;
   // Read id bytes
   ProductId result;
   result.manufacturer = readAddr(0x0000);
@@ -118,5 +123,6 @@ inline void writeAddrData(uint16_t address, uint8_t data) {
 inline uint8_t readAddr(uint16_t address) {
   PORT_ADDR_HIGH = address >> 8;
   PORT_ADDR_LOW = address & 0xff;
+  delayMicroseconds(2);  // no idea why I have to wait so long...
   return PIN_DATA;
 }
