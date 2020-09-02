@@ -90,7 +90,7 @@ void loop() {
     if(bytesRead != 128) {
       Serial.println("Timed out waiting for 128 bytes");
       return;
-    }    
+    }
     writePage(128 * page, inputBuffer);
     Serial.println("OK");
     return;
@@ -223,6 +223,7 @@ inline void writePulse() {
 inline uint8_t readAddr(uint16_t address) {
   PORT_ADDR_HIGH = address >> 8;
   PORT_ADDR_LOW = address & 0xff;
+  delayMicroseconds(2);  // still don't know why I need this
   return PIN_DATA;
 }
 

@@ -31,12 +31,12 @@ def main():
                        total=ROM_SIZE) as t:
             t.set_description('Writing')
             for offset in range(0, ROM_SIZE, PAGE_SIZE):
-                t.update(PAGE_SIZE)
-                page = offset//PAGE_SIZE
+                page = offset // PAGE_SIZE
                 dev.write(f'write {page}\n'.encode('ascii'))
                 dev.expect(b'#')
                 dev.write(data[offset:offset+PAGE_SIZE])
                 result = dev.expect(b'>')
+                t.update(PAGE_SIZE)
                 if b'OK' not in result:
                     t.close()
                     print(result.replace(b'ready>', b'').decode('ascii'),
@@ -47,12 +47,12 @@ def main():
                        total=ROM_SIZE) as t:
             t.set_description('Verifying')
             for offset in range(0, ROM_SIZE, PAGE_SIZE):
-                t.update(PAGE_SIZE)
-                page = offset//PAGE_SIZE
+                page = offset // PAGE_SIZE
                 dev.write(f'verify {page}\n'.encode('ascii'))
                 dev.expect(b'#')
                 dev.write(data[offset:offset+PAGE_SIZE])
                 result = dev.expect(b'>')
+                t.update(PAGE_SIZE)
                 if b'OK' not in result:
                     t.close()
                     print(f'page {page} failed verification:', file=sys.stderr)
