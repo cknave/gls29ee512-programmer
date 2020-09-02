@@ -1,8 +1,31 @@
-const int AddressPins[16] = {22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37};
-const int DataPins[8] = {46, 47, 48, 49, 50, 51, 52, 53};
-const int WriteEnablePin = 21;
-const int OutputEnablePin = 19;
-const int ChipEnablePin = 20;
+// a7..a0 -> pin 29..22
+#define PORT_ADDR_LOW PORTA
+#define DDR_ADDR_LOW DDRA
+
+// a15..a8 -> pin 30..37
+#define PORT_ADDR_HIGH PORTC
+#define DDR_ADDR_HIGH DDRC
+
+// d7..d0 -> pin 42..49
+#define PORT_DATA PORTL
+#define DDR_DATA DDRL
+#define PIN_DATA PINL
+
+// _,_,_,_,_,we,ce,oe -> pin x,x,x,x,x,39,40,41
+#define PORT_CTRL PORTG 
+#define DDR_CTRL DDRG
+
+#define OE_MASK (1<<0)
+#define CE_MASK (1<<1)
+#define WE_MASK (1<<2)
+
+#define OUTPUT_ENABLED 0
+#define OUTPUT_DISABLED OE_MASK
+#define CHIP_ENABLED 0
+#define CHIP_DISABLED CE_MASK
+#define WRITE_ENABLED 0
+#define WRITE_DISABLED WE_MASK
+
 
 typedef struct {
   uint8_t manufacturer;
@@ -10,16 +33,19 @@ typedef struct {
 } ProductId;
 
 void setup() {
-  for(int i = 0; i < 16; i++) {
-    pinMode(AddressPins[i], OUTPUT);
-  }
-  setDataMode(INPUT);
-  pinMode(WriteEnablePin, OUTPUT);
-  digitalWrite(WriteEnablePin, HIGH);  
-  pinMode(OutputEnablePin, OUTPUT);
-  digitalWrite(OutputEnablePin, HIGH);
-  pinMode(ChipEnablePin, OUTPUT);
-  digitalWrite(ChipEnablePin, HIGH);
+  // Set address pins to output zeros
+  DDR_ADDR_LOW = 0xff;
+  PORT_ADDR_LOW = 0x00;
+  DDR_ADDR_HIGH = 0xff;
+  PORT_ADDR_HIGH = 0x00;
+
+  // Disable all chip functions (output high)
+  DDR_CTRL = OE_MASK | CE_MASK | WE_MASK;
+  PORT_CTRL = OUTPUT_DISABLED | CHIP_DISABLED | WRITE_DISABLED;
+
+  // Set data to input
+  DDR_DATA = 0x00;
+  PORT_DATA = 0x00;
 
   Serial.begin(57600);
 }
@@ -30,102 +56,67 @@ void loop() {
   sprintf(buf, "Manufacturer: %02X, product: %02X", productId.manufacturer, productId.device);
   Serial.println(buf);
 
-  setDataMode(INPUT);
-  for(int row = 0; row < 64; row++) {
-    uint8_t bytes[16];
-    for(int col = 0; col < 16; col++) {
-      bytes[col] = readData(row*16 + col);
-    }
-    sprintf(buf, "%04X  %02X %02X %02X %02X %02X %02X %02X %02X   %02X %02X %02X %02X %02X %02X %02X %02X",
-            row*16,
-            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]);
-    Serial.println(buf);
-  }
-  
-  while(true) {delay(1000);}
+  while(true) { delay(1000); }
+
+//  setDataMode(INPUT);
+//  for(int row = 0; row < 64; row++) {
+//    uint8_t bytes[16];
+//    for(int col = 0; col < 16; col++) {
+//      bytes[col] = readData(row*16 + col);
+//    }
+//    sprintf(buf, "%04X  %02X %02X %02X %02X %02X %02X %02X %02X   %02X %02X %02X %02X %02X %02X %02X %02X",
+//            row*16,
+//            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+//            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]);
+//    Serial.println(buf);
+//  }
+//  
+//  while(true) {delay(1000);}
 }
 
 ProductId getProductId() {
+  PORT_CTRL = CHIP_ENABLED | OUTPUT_DISABLED | WRITE_DISABLED;
+  // Data pins to output mode
+  DDR_DATA = 0xff;
   // Enter software ID mode
-  digitalWrite(ChipEnablePin, LOW);
-  digitalWrite(OutputEnablePin, HIGH);
-  setDataMode(OUTPUT);
-  writeData(0x5555, 0xaa);
-  writeData(0x2aaa, 0x55);
-  writeData(0x5555, 0x90);  
-  digitalWrite(ChipEnablePin, HIGH);
-  digitalWrite(OutputEnablePin, HIGH);
-  digitalWrite(WriteEnablePin, HIGH);
+  writeAddrData(0x5555, 0xaa);
+  writeAddrData(0x2aaa, 0x55);
+  writeAddrData(0x5555, 0x90);
+  PORT_CTRL = CHIP_DISABLED | OUTPUT_DISABLED | WRITE_DISABLED;
   delayMicroseconds(10);
 
-  // Read id
+  PORT_CTRL = CHIP_ENABLED | OUTPUT_ENABLED | WRITE_DISABLED;
+  // Data pins to input mode
+  DDR_DATA = 0x00;
+  // Read id bytes
   ProductId result;
-  setDataMode(INPUT);
-  result.manufacturer = readData(0x0000);
-  result.device = readData(0x0001);
+  result.manufacturer = readAddr(0x0000);
+  result.device = readAddr(0x0001);
 
+  PORT_CTRL = CHIP_ENABLED | OUTPUT_DISABLED | WRITE_DISABLED;
+  // Data pins to output mode
+  DDR_DATA = 0xff;
   // Exit software ID mode
-  digitalWrite(ChipEnablePin, LOW);
-  digitalWrite(OutputEnablePin, HIGH);
-  setDataMode(OUTPUT);
-  writeData(0x5555, 0xaa);
-  writeData(0x2aaa, 0x55);
-  writeData(0x5555, 0xf0);
-  digitalWrite(ChipEnablePin, HIGH);
-  digitalWrite(OutputEnablePin, HIGH);
-  digitalWrite(WriteEnablePin, HIGH);
+  writeAddrData(0x5555, 0xaa);
+  writeAddrData(0x2aaa, 0x55);
+  writeAddrData(0x5555, 0xf0);
+  // Disable chip, output, and write
   delayMicroseconds(10);
 
   return result;
 }
 
-void writeData(uint16_t address, uint8_t data) {
-  setAddressLines(address);
-  setDataLines(data);
+inline void writeAddrData(uint16_t address, uint8_t data) {
+  PORT_ADDR_HIGH = address >> 8;
+  PORT_ADDR_LOW = address & 0xff;
+  PORT_DATA = data;
   // write pulse
-  digitalWrite(WriteEnablePin, LOW);
-  digitalWrite(WriteEnablePin, HIGH);
+  PORT_CTRL = OUTPUT_DISABLED | CHIP_ENABLED | WRITE_ENABLED;
+  PORT_CTRL = OUTPUT_DISABLED | CHIP_ENABLED | WRITE_DISABLED;
 }
 
-void setDataMode(int mode) {
-  for(int i = 0; i < 8; i++) {
-    pinMode(DataPins[i], mode);
-  }  
-}
-
-void setAddressLines(uint16_t address) {
-  for(int i = 0; i < 16; i++) {
-    bool bitSet = (address & (1 << i)) != 0;
-    digitalWrite(AddressPins[i], bitSet ? HIGH : LOW);
-//    char buf[128];
-//    sprintf(buf, "[W] a%d = %d", i, bitSet);
-//    Serial.println(buf);
-  }
-}
-
-uint8_t readData(uint16_t address) {
-  setAddressLines(address);
-  digitalWrite(ChipEnablePin, LOW);
-  digitalWrite(OutputEnablePin, LOW);
-  delayMicroseconds(1);
-  uint8_t result = 0;
-  for(int i = 0; i < 8; i++) {
-    int bitValue = digitalRead(DataPins[i]) == HIGH ? 1 : 0;
-    result |= bitValue << i;
-//    char buf[128];
-//    sprintf(buf, "[R] d%d = %d", i, bitValue);
-//    Serial.println(buf);    
-  }
-  return result;
-}
-
-void setDataLines(uint8_t data) {
-  for(int i = 0; i < 8; i++) {
-    bool bitSet = (data & (1 << i)) != 0;
-    digitalWrite(DataPins[i], bitSet ? HIGH : LOW);
-//    char buf[128];
-//    sprintf(buf, "[W] d%d = %d", i, bitSet);
-//    Serial.println(buf);
-  }
+inline uint8_t readAddr(uint16_t address) {
+  PORT_ADDR_HIGH = address >> 8;
+  PORT_ADDR_LOW = address & 0xff;
+  return PIN_DATA;
 }
