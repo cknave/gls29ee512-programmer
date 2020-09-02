@@ -48,6 +48,8 @@ void loop() {
 
 ProductId getProductId() {
   // Enter software ID mode
+  digitalWrite(ChipEnablePin, LOW);
+  digitalWrite(OutputEnablePin, HIGH);
   setDataMode(OUTPUT);
   writeData(0x5555, 0xaa);
   writeData(0x2aaa, 0x55);
@@ -64,6 +66,8 @@ ProductId getProductId() {
   result.device = readData(0x0001);
 
   // Exit software ID mode
+  digitalWrite(ChipEnablePin, LOW);
+  digitalWrite(OutputEnablePin, HIGH);
   setDataMode(OUTPUT);
   writeData(0x5555, 0xaa);
   writeData(0x2aaa, 0x55);
@@ -77,16 +81,10 @@ ProductId getProductId() {
 }
 
 void writeData(uint16_t address, uint8_t data) {
-  digitalWrite(ChipEnablePin, HIGH);
-  digitalWrite(OutputEnablePin, HIGH);
-  digitalWrite(WriteEnablePin, HIGH);
-  
   setAddressLines(address);
   setDataLines(data);
   // write pulse
-  digitalWrite(ChipEnablePin, LOW);
   digitalWrite(WriteEnablePin, LOW);
-  delayMicroseconds(1);
   digitalWrite(WriteEnablePin, HIGH);
 }
 
@@ -110,7 +108,6 @@ uint8_t readData(uint16_t address) {
   setAddressLines(address);
   digitalWrite(ChipEnablePin, LOW);
   digitalWrite(OutputEnablePin, LOW);
-  digitalWrite(WriteEnablePin, HIGH);
   delayMicroseconds(1);
   uint8_t result = 0;
   for(int i = 0; i < 8; i++) {
