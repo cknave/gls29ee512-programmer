@@ -113,31 +113,36 @@ void loop() {
     return;
   }
   if(!strncmp("hexdump", inputBuffer, cmdEnd)) {
-    hexDump();
+    int page;
+    if(!parseNumberArgument(inputBuffer, sizeof(inputBuffer), cmdEnd, &page)) {
+      return;
+    }
+    if(page < 0 || page >= 512) {
+      Serial.println("Page must be between 0 and 511 inclusive");
+      return;
+    }
+    hexDump(128 * page);
     return;
   }
   Serial.println("Unrecognized command");
   return;
 }
 
-void hexDump() {
-  delay(10);
+void hexDump(int baseAddr) {
   char buf[128];
   setDataReadMode();
-  PORT_CTRL = CHIP_ENABLED | OUTPUT_ENABLED | WRITE_DISABLED;
-  for(int row = 0; row < 64; row++) {
+  PORT_CTRL = CHIP_ENABLED | OUTPUT_DISABLED | WRITE_DISABLED;
+  for(int row = 0; row < 8; row++) {
     uint8_t bytes[16];
     for(int col = 0; col < 16; col++) {
-      bytes[col] = readAddr(row*16 + col);
+      bytes[col] = readAddr(baseAddr + row*16 + col);
     }
     sprintf(buf, "%04X  %02X %02X %02X %02X %02X %02X %02X %02X   %02X %02X %02X %02X %02X %02X %02X %02X",
-            row*16,
+            baseAddr + row*16,
             bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
             bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]);
     Serial.println(buf);
   }
-  
-  while(true) {delay(1000);}
 }
 
 ProductId getProductId() {
@@ -151,11 +156,11 @@ ProductId getProductId() {
   delayMicroseconds(10);
 
   setDataReadMode();
-  PORT_CTRL = CHIP_ENABLED | OUTPUT_ENABLED | WRITE_DISABLED;
+  PORT_CTRL = CHIP_ENABLED | OUTPUT_DISABLED | WRITE_DISABLED;
   // Read id bytes
   ProductId result;
-  result.manufacturer = readAddr(0x0000);
-  result.device = readAddr(0x0001);
+  result.manufacturer = readAddrSlow(0x0000);
+  result.device = readAddrSlow(0x0001);
 
   PORT_CTRL = CHIP_ENABLED | OUTPUT_DISABLED | WRITE_DISABLED;
   setDataWriteMode();
@@ -209,7 +214,6 @@ inline void writeAddrData(uint16_t address, uint8_t data) {
   PORT_ADDR_HIGH = address >> 8;
   PORT_ADDR_LOW = address & 0xff;
   PORT_DATA = data;
-  __asm__("nop");
   writePulse();
 }
 
@@ -219,12 +223,21 @@ inline void writePulse() {
   PORT_CTRL = OUTPUT_DISABLED | CHIP_ENABLED | WRITE_DISABLED;
 }
 
-inline uint8_t readAddr(uint16_t address) {
+// Slow read needed for reading product id for some reason
+inline uint8_t readAddrSlow(uint16_t address) {
+  PORT_CTRL = OUTPUT_DISABLED | CHIP_ENABLED | WRITE_DISABLED;
   PORT_ADDR_HIGH = address >> 8;
   PORT_ADDR_LOW = address & 0xff;
-  // I don't know why this is so slow
-  // read cycle time is supposed to be 70 ns
-  delayMicroseconds(5);
+  PORT_CTRL = OUTPUT_ENABLED | CHIP_ENABLED | WRITE_DISABLED;
+  delayMicroseconds(3);
+  return PIN_DATA;
+}
+
+inline uint8_t readAddr(uint16_t address) {
+  PORT_CTRL = OUTPUT_DISABLED | CHIP_ENABLED | WRITE_DISABLED;
+  PORT_ADDR_HIGH = address >> 8;
+  PORT_ADDR_LOW = address & 0xff;
+  PORT_CTRL = OUTPUT_ENABLED | CHIP_ENABLED | WRITE_DISABLED;
   return PIN_DATA;
 }
 
@@ -299,7 +312,7 @@ bool parseNumberArgument(char *s, int size, int startAfter, int *resultPtr) {
 
 bool verifyPage(uint16_t baseAddr, uint8_t *expected) {
   setDataReadMode();
-  PORT_CTRL = CHIP_ENABLED | OUTPUT_ENABLED | WRITE_DISABLED;
+  PORT_CTRL = CHIP_ENABLED | OUTPUT_DISABLED | WRITE_DISABLED;
   for(int i = 0; i < 128; i++) {
     uint8_t value = readAddr(baseAddr + i);
     if(value != expected[i]) {
