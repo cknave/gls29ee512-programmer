@@ -109,8 +109,6 @@ void loop() {
     }    
     if(verifyPage(128 * page, inputBuffer)) {
       Serial.println("OK");
-    } else {
-      Serial.println("FAIL");
     }
     return;
   }
@@ -156,8 +154,8 @@ ProductId getProductId() {
   PORT_CTRL = CHIP_ENABLED | OUTPUT_ENABLED | WRITE_DISABLED;
   // Read id bytes
   ProductId result;
-  result.manufacturer = slowReadAddr(0x0000);
-  result.device = slowReadAddr(0x0001);
+  result.manufacturer = readAddr(0x0000);
+  result.device = readAddr(0x0001);
 
   PORT_CTRL = CHIP_ENABLED | OUTPUT_DISABLED | WRITE_DISABLED;
   setDataWriteMode();
@@ -211,6 +209,7 @@ inline void writeAddrData(uint16_t address, uint8_t data) {
   PORT_ADDR_HIGH = address >> 8;
   PORT_ADDR_LOW = address & 0xff;
   PORT_DATA = data;
+  __asm__("nop");
   writePulse();
 }
 
@@ -223,18 +222,11 @@ inline void writePulse() {
 inline uint8_t readAddr(uint16_t address) {
   PORT_ADDR_HIGH = address >> 8;
   PORT_ADDR_LOW = address & 0xff;
-  delayMicroseconds(2);  // still don't know why I need this
+  // I don't know why this is so slow
+  // read cycle time is supposed to be 70 ns
+  delayMicroseconds(5);
   return PIN_DATA;
 }
-
-// Required for reading the device ID
-inline uint8_t slowReadAddr(uint16_t address) {
-  PORT_ADDR_HIGH = address >> 8;
-  PORT_ADDR_LOW = address & 0xff;
-  delayMicroseconds(3);
-  return PIN_DATA;
-}
-
 
 inline void setDataWriteMode() {
   DDR_DATA = 0xff;
@@ -311,6 +303,9 @@ bool verifyPage(uint16_t baseAddr, uint8_t *expected) {
   for(int i = 0; i < 128; i++) {
     uint8_t value = readAddr(baseAddr + i);
     if(value != expected[i]) {
+      char errbuf[128];
+      sprintf(errbuf, "At address %04X, expected %02X but got %02X", baseAddr + i, expected[i], value);
+      Serial.println(errbuf);
       return false;
     }
   }
