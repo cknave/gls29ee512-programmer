@@ -62,6 +62,8 @@ void setup() {
 }
 
 void loop() {
+  PORT_CTRL = OUTPUT_DISABLED | CHIP_DISABLED | WRITE_DISABLED;
+  setDataReadMode();
   Serial.print("ready>");
   readSerialCommand(inputBuffer, sizeof(inputBuffer));
   Serial.println();
@@ -131,7 +133,7 @@ void loop() {
 void hexDump(int baseAddr) {
   char buf[128];
   setDataReadMode();
-  PORT_CTRL = CHIP_ENABLED | OUTPUT_DISABLED | WRITE_DISABLED;
+  PORT_CTRL = CHIP_ENABLED | OUTPUT_ENABLED | WRITE_DISABLED;
   for(int row = 0; row < 8; row++) {
     uint8_t bytes[16];
     for(int col = 0; col < 16; col++) {
@@ -143,6 +145,7 @@ void hexDump(int baseAddr) {
             bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]);
     Serial.println(buf);
   }
+  PORT_CTRL = CHIP_DISABLED | OUTPUT_DISABLED | WRITE_DISABLED;
 }
 
 ProductId getProductId() {
@@ -220,7 +223,12 @@ inline void writeAddrData(uint16_t address, uint8_t data) {
 // Pulse the WE line
 inline void writePulse() {
   PORT_CTRL = OUTPUT_DISABLED | CHIP_ENABLED | WRITE_ENABLED;
+  // >70 ns
+  __asm__("nop\n"\
+          "nop");
   PORT_CTRL = OUTPUT_DISABLED | CHIP_ENABLED | WRITE_DISABLED;
+  // Add another ~40 ns to make sure we're over the 50 ns load cycle time
+  __asm__("nop");
 }
 
 // Slow read needed for reading product id for some reason
@@ -234,10 +242,11 @@ inline uint8_t readAddrSlow(uint16_t address) {
 }
 
 inline uint8_t readAddr(uint16_t address) {
-  PORT_CTRL = OUTPUT_DISABLED | CHIP_ENABLED | WRITE_DISABLED;
   PORT_ADDR_HIGH = address >> 8;
   PORT_ADDR_LOW = address & 0xff;
-  PORT_CTRL = OUTPUT_ENABLED | CHIP_ENABLED | WRITE_DISABLED;
+  // >70 ns
+  __asm__("nop\n"\
+          "nop");
   return PIN_DATA;
 }
 
@@ -290,6 +299,7 @@ void printHelp() {
   Serial.println("write <page> - write a 128 byte page where <page> is a number between 0 and 511");
   Serial.println("               inclusive; after the newline, write all 128 data bytes");
   Serial.println("verify <page> - verify a 128 byte page; after the newline send bytes to verify");
+  Serial.println("hexdump <page> - print a hex dump of this page");
 }
 
 bool parseNumberArgument(char *s, int size, int startAfter, int *resultPtr) {
@@ -312,7 +322,7 @@ bool parseNumberArgument(char *s, int size, int startAfter, int *resultPtr) {
 
 bool verifyPage(uint16_t baseAddr, uint8_t *expected) {
   setDataReadMode();
-  PORT_CTRL = CHIP_ENABLED | OUTPUT_DISABLED | WRITE_DISABLED;
+  PORT_CTRL = CHIP_ENABLED | OUTPUT_ENABLED | WRITE_DISABLED;
   for(int i = 0; i < 128; i++) {
     uint8_t value = readAddr(baseAddr + i);
     if(value != expected[i]) {
@@ -322,5 +332,6 @@ bool verifyPage(uint16_t baseAddr, uint8_t *expected) {
       return false;
     }
   }
+  PORT_CTRL = CHIP_DISABLED | OUTPUT_DISABLED | WRITE_DISABLED;
   return true;
 }
