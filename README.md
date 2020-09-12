@@ -54,6 +54,8 @@ You should now be able to open the serial monitor in the Arduino IDE and set the
     Manufacturer: BF, product: 5D
     ready>
 
+Make sure to close the serial monitor before trying to use the programmer script.
+
 [data sheet]: https://www.greenliant.com/dotAsset/40945.pdf
 
 
