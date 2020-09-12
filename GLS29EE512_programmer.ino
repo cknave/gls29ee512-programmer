@@ -78,12 +78,8 @@ void loop() {
     return;
   }
   if(!strncmp("write", inputBuffer, cmdEnd)) {
-    int page;
-    if(!parseNumberArgument(inputBuffer, sizeof(inputBuffer), cmdEnd, &page)) {
-      return;
-    }
-    if(page < 0 || page >= 512) {
-      Serial.println("Page must be between 0 and 511 inclusive");
+    int page = parsePageArgument(inputBuffer, sizeof(inputBuffer), cmdEnd);
+    if(page < 0) {
       return;
     }
     Serial.print("INPUT 128 BYTES#");
@@ -98,8 +94,8 @@ void loop() {
     return;
   }
   if(!strncmp("verify", inputBuffer, cmdEnd)) {
-    int page;
-    if(!parseNumberArgument(inputBuffer, sizeof(inputBuffer), cmdEnd, &page)) {
+    int page = parsePageArgument(inputBuffer, sizeof(inputBuffer), cmdEnd);
+    if(page < 0) {
       return;
     }
     Serial.print("INPUT 128 BYTES#");
@@ -115,12 +111,8 @@ void loop() {
     return;
   }
   if(!strncmp("hexdump", inputBuffer, cmdEnd)) {
-    int page;
-    if(!parseNumberArgument(inputBuffer, sizeof(inputBuffer), cmdEnd, &page)) {
-      return;
-    }
-    if(page < 0 || page >= 512) {
-      Serial.println("Page must be between 0 and 511 inclusive");
+    int page = parsePageArgument(inputBuffer, sizeof(inputBuffer), cmdEnd);
+    if(page < 0) {
       return;
     }
     hexDump(128 * page);
@@ -137,7 +129,7 @@ void hexDump(int baseAddr) {
   for(int row = 0; row < 8; row++) {
     uint8_t bytes[16];
     for(int col = 0; col < 16; col++) {
-      bytes[col] = readAddr(baseAddr + row*16 + col);
+      bytes[col] = readAddrSlow(baseAddr + row*16 + col);
     }
     sprintf(buf, "%04X  %02X %02X %02X %02X %02X %02X %02X %02X   %02X %02X %02X %02X %02X %02X %02X %02X",
             baseAddr + row*16,
@@ -227,8 +219,6 @@ inline void writePulse() {
   __asm__("nop\n"\
           "nop");
   PORT_CTRL = OUTPUT_DISABLED | CHIP_ENABLED | WRITE_DISABLED;
-  // Add another ~40 ns to make sure we're over the 50 ns load cycle time
-  __asm__("nop");
 }
 
 // Slow read needed for reading product id for some reason
@@ -302,11 +292,11 @@ void printHelp() {
   Serial.println("hexdump <page> - print a hex dump of this page");
 }
 
-bool parseNumberArgument(char *s, int size, int startAfter, int *resultPtr) {
+int parsePageArgument(char *s, int size, int startAfter) {
   int argEnd = findTokenEnd(s, size, startAfter);
   if(argEnd <= startAfter + 1) {
     Serial.println("Missing argument");
-    return false;
+    return -1;
   }
   char *arg = inputBuffer + startAfter + 1;
   inputBuffer[argEnd] = '\0';
@@ -314,17 +304,20 @@ bool parseNumberArgument(char *s, int size, int startAfter, int *resultPtr) {
   long int result = strtol(arg, &parseEnd, 10);
   if(parseEnd != inputBuffer + argEnd) {
     Serial.println("Invalid argument");
-    return false;
+    return -1;
   }
-  *resultPtr = result;
-  return true;
+  if(result < 0 || result >= 512) {
+    Serial.println("Page must be between 0 and 511 inclusive");
+    return -1;
+  }
+  return result;
 }
 
 bool verifyPage(uint16_t baseAddr, uint8_t *expected) {
   setDataReadMode();
   PORT_CTRL = CHIP_ENABLED | OUTPUT_ENABLED | WRITE_DISABLED;
   for(int i = 0; i < 128; i++) {
-    uint8_t value = readAddr(baseAddr + i);
+    uint8_t value = readAddrSlow(baseAddr + i);
     if(value != expected[i]) {
       char errbuf[128];
       sprintf(errbuf, "At address %04X, expected %02X but got %02X", baseAddr + i, expected[i], value);
