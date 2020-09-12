@@ -15,7 +15,7 @@ Requirements
 For software, you'll need:
 
  * Arduino IDE
- * Python 3.7 or higher
+ * Python 3.7 or higher with [pyserial] and [tqdm]
 
 For hardware, you'll need:
  * an Arduino Mega 2560*
@@ -25,6 +25,8 @@ For hardware, you'll need:
 (*) Other Arduinos should work, but you'll probably need to reassign the ports at the top of
 [GLS29EE512_programmer.ino] if you're not using ports A, C, G, and L.
 
+[pyserial]: https://github.com/pyserial/pyserial
+[tqdm]: https://github.com/tqdm/tqdm
 [GLS29EE512_programmer.ino]: https://github.com/cknave/gls29ee512-programmer/blob/master/GLS29EE512_programmer.ino
 
 
@@ -61,6 +63,11 @@ Make sure to close the serial monitor before trying to use the programmer script
 
 Using the programmer script
 ---------------------------
+Install the script requirements.  I recommend doing this in a virtual environment so you're not
+trapped in Python dependency hell:
+
+    pip install -r requirements.txt
+
 If there is one serial device in `/dev/ttyACM*`, it will be used.  Otherwise, you'll need to set the
 device with the `-d <device>` option.
 
