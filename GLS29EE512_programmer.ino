@@ -118,6 +118,14 @@ void loop() {
     hexDump(128 * page);
     return;
   }
+  if(!strncmp("read", inputBuffer, cmdEnd)) {
+    int page = parsePageArgument(inputBuffer, sizeof(inputBuffer), cmdEnd);
+    if(page < 0) {
+      return;
+    }
+    rawDump(128 * page);
+    return;
+  }
   Serial.println("Unrecognized command");
   return;
 }
@@ -138,6 +146,18 @@ void hexDump(int baseAddr) {
     Serial.println(buf);
   }
   PORT_CTRL = CHIP_DISABLED | OUTPUT_DISABLED | WRITE_DISABLED;
+}
+
+void rawDump(int baseAddr) {
+  Serial.print("READ 128 BYTES#");
+  setDataReadMode();
+  PORT_CTRL = CHIP_ENABLED | OUTPUT_ENABLED | WRITE_DISABLED;
+  for(int i = 0; i < 128; i++) {
+    uint8_t val = readAddrSlow(baseAddr + i);
+    Serial.write(val);
+  }
+  PORT_CTRL = CHIP_DISABLED | OUTPUT_DISABLED | WRITE_DISABLED;
+  Serial.println();
 }
 
 ProductId getProductId() {
@@ -285,6 +305,7 @@ void printHelp() {
   Serial.println();
   Serial.println("Commands:");
   Serial.println("help - print this text");
+  Serial.println("read <page> - send all 128 bytes of this page after the '#' character");
   Serial.println("write <page> - write a 128 byte page where <page> is a number between 0 and 511");
   Serial.println("               inclusive; after the newline, write all 128 data bytes");
   Serial.println("verify <page> - verify a 128 byte page; after the newline send bytes to verify");
