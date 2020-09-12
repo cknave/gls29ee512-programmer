@@ -216,8 +216,7 @@ inline void writeAddrData(uint16_t address, uint8_t data) {
 inline void writePulse() {
   PORT_CTRL = OUTPUT_DISABLED | CHIP_ENABLED | WRITE_ENABLED;
   // >70 ns
-  __asm__("nop\n"\
-          "nop");
+  __asm__("nop");
   PORT_CTRL = OUTPUT_DISABLED | CHIP_ENABLED | WRITE_DISABLED;
 }
 
