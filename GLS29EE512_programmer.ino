@@ -137,7 +137,7 @@ void hexDump(int baseAddr) {
   for(int row = 0; row < 8; row++) {
     uint8_t bytes[16];
     for(int col = 0; col < 16; col++) {
-      bytes[col] = readAddrSlow(baseAddr + row*16 + col);
+      bytes[col] = readAddr(baseAddr + row*16 + col);
     }
     sprintf(buf, "%04X  %02X %02X %02X %02X %02X %02X %02X %02X   %02X %02X %02X %02X %02X %02X %02X %02X",
             baseAddr + row*16,
@@ -153,7 +153,7 @@ void rawDump(int baseAddr) {
   setDataReadMode();
   PORT_CTRL = CHIP_ENABLED | OUTPUT_ENABLED | WRITE_DISABLED;
   for(int i = 0; i < 128; i++) {
-    uint8_t val = readAddrSlow(baseAddr + i);
+    uint8_t val = readAddr(baseAddr + i);
     Serial.write(val);
   }
   PORT_CTRL = CHIP_DISABLED | OUTPUT_DISABLED | WRITE_DISABLED;
@@ -337,7 +337,7 @@ bool verifyPage(uint16_t baseAddr, uint8_t *expected) {
   setDataReadMode();
   PORT_CTRL = CHIP_ENABLED | OUTPUT_ENABLED | WRITE_DISABLED;
   for(int i = 0; i < 128; i++) {
-    uint8_t value = readAddrSlow(baseAddr + i);
+    uint8_t value = readAddr(baseAddr + i);
     if(value != expected[i]) {
       char errbuf[128];
       sprintf(errbuf, "At address %04X, expected %02X but got %02X", baseAddr + i, expected[i], value);
